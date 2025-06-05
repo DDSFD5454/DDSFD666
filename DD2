@@ -13340,7 +13340,924 @@ addcmd('IvoryPeriastron', {'iperiastron'}, function(args, speaker)
     end
 end)
 
+local inputConnection
+local heartbeatConnection
+local charAddedConnection
+local playerAddedConnection
+local ropeConnection
+local toolWatchConnection
+local backpackCleanConnections = {}
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TargetGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 260, 0, 450)
+frame.Position = UDim2.new(0, 300, 0, 250)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.5
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+
+-- Add rounded corners
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = frame
+
+local textbox = Instance.new("TextBox")
+textbox.PlaceholderText = "Target: Ctrl+LMB to set"
+textbox.Size = UDim2.new(0, 240, 0, 30)
+textbox.Position = UDim2.new(0, 10, 0, 10)
+textbox.Text = ""
+textbox.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+textbox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textbox.TextSize = 14
+textbox.Font = Enum.Font.SourceSansBold
+textbox.ClearTextOnFocus = false
+textbox.TextEditable = true
+textbox.Parent = frame
+textbox.ZIndex = 2
+
+local cornerText = Instance.new("UICorner")
+cornerText.CornerRadius = UDim.new(0, 6)
+cornerText.Parent = textbox
+
+local destroyBtn = Instance.new("TextButton")
+destroyBtn.Text = "Destroy GUI"
+destroyBtn.Size = UDim2.new(0, 240, 0, 30)
+destroyBtn.Position = UDim2.new(0, 10, 0, 50)
+destroyBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+destroyBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+destroyBtn.TextSize = 14
+destroyBtn.Font = Enum.Font.SourceSansBold
+destroyBtn.Parent = frame
+destroyBtn.ZIndex = 2
+
+local cornerDestroy = Instance.new("UICorner")
+cornerDestroy.CornerRadius = UDim.new(0, 6)
+cornerDestroy.Parent = destroyBtn
+
+local deleteFFBtn = Instance.new("TextButton")
+deleteFFBtn.Text = "Delete ForceFields"
+deleteFFBtn.Size = UDim2.new(0, 240, 0, 30)
+deleteFFBtn.Position = UDim2.new(0, 10, 0, 90)
+deleteFFBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+deleteFFBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+deleteFFBtn.TextSize = 14
+deleteFFBtn.Font = Enum.Font.SourceSansBold
+deleteFFBtn.Parent = frame
+deleteFFBtn.ZIndex = 2
+
+local cornerFF = Instance.new("UICorner")
+cornerFF.CornerRadius = UDim.new(0, 6)
+cornerFF.Parent = deleteFFBtn
+
+deleteFFBtn.MouseButton1Click:Connect(function()
+    for i = 1, 8 do
+        local terrainFolder = Workspace:FindFirstChild("Terrain" .. i)
+        if terrainFolder then
+            for _, obj in ipairs(terrainFolder:GetChildren()) do
+                if obj:IsA("Part") and obj.Name == "ForceFields" then
+                    obj:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+local velocityBtn = Instance.new("TextButton")
+velocityBtn.Text = "Delete Velocity: ON"
+velocityBtn.Size = UDim2.new(0, 240, 0, 30)
+velocityBtn.Position = UDim2.new(0, 10, 0, 130)
+velocityBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+velocityBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+velocityBtn.TextSize = 14
+velocityBtn.Font = Enum.Font.SourceSansBold
+velocityBtn.Parent = frame
+velocityBtn.ZIndex = 2
+
+local cornerVel = Instance.new("UICorner")
+cornerVel.CornerRadius = UDim.new(0, 6)
+cornerVel.Parent = velocityBtn
+
+local enabled = true
+local torsoListener = nil
+local charListener = nil
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+local function startMonitoring(character)
+    if not enabled then return end
+    local torso = character:WaitForChild("Torso", 5)
+    if not torso then return end
+    
+    for _, child in ipairs(torso:GetChildren()) do
+        if child:IsA("BodyVelocity") then
+            child:Destroy()
+        end
+    end
+    
+    if torsoListener then
+        torsoListener:Disconnect()
+    end
+    torsoListener = torso.ChildAdded:Connect(function(child)
+        if enabled and child:IsA("BodyVelocity") then
+            task.defer(function()
+                if child and child.Parent then
+                    child:Destroy()
+                end
+            end)
+        end
+    end)
+end
+
+startMonitoring(Character)
+
+charListener = LocalPlayer.CharacterAdded:Connect(function(newChar)
+    Character = newChar
+    if torsoListener then
+        torsoListener:Disconnect()
+        torsoListener = nil
+    end
+    startMonitoring(newChar)
+end)
+
+local function resetTargetPosition()
+    _G.TargetPosition = nil
+    savedPart = nil
+    savedPartCFrame = nil
+    trackedPlayer = nil
+    if _G.TargetVisualPoint then
+        _G.TargetVisualPoint:Destroy()
+        _G.TargetVisualPoint = nil
+    end
+    textbox.Text = ""
+end
+
+velocityBtn.MouseButton1Click:Connect(function()
+    enabled = not enabled
+    velocityBtn.Text = "Delete Velocity: " .. (enabled and "ON" or "OFF")
+    if enabled then
+        startMonitoring(Character)
+    elseif torsoListener then
+        torsoListener:Disconnect()
+        torsoListener = nil
+    end
+end)
+
+local weldInfoBox = Instance.new("TextBox")
+weldInfoBox.Text = "Weld Info: N/A"
+weldInfoBox.Size = UDim2.new(0, 240, 0, 30)
+weldInfoBox.Position = UDim2.new(0, 10, 0, 170)
+weldInfoBox.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+weldInfoBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+weldInfoBox.TextSize = 14
+weldInfoBox.Font = Enum.Font.SourceSansBold
+weldInfoBox.ClearTextOnFocus = false
+weldInfoBox.TextEditable = false
+weldInfoBox.Parent = frame
+weldInfoBox.ZIndex = 2
+
+local cornerWeld = Instance.new("UICorner")
+cornerWeld.CornerRadius = UDim.new(0, 6)
+cornerWeld.Parent = weldInfoBox
+
+local ivoryBtn = Instance.new("TextButton")
+ivoryBtn.Text = "Ivory"
+ivoryBtn.Size = UDim2.new(0, 240, 0, 30)
+ivoryBtn.Position = UDim2.new(0, 10, 0, 210)
+ivoryBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+ivoryBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+ivoryBtn.TextSize = 14
+ivoryBtn.Font = Enum.Font.SourceSansBold
+ivoryBtn.Parent = frame
+ivoryBtn.ZIndex = 2
+
+local cornerIvory = Instance.new("UICorner")
+cornerIvory.CornerRadius = UDim.new(0, 6)
+cornerIvory.Parent = ivoryBtn
+
+ivoryBtn.MouseButton1Click:Connect(function()
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local tool = player:FindFirstChildOfClass("Backpack"):FindFirstChild("IvoryPeriastron") or character:FindFirstChild("IvoryPeriastron")
+    if tool then
+        tool.Parent = character
+    end
+end)
+
+local deleteSpawnLocationsBtn = Instance.new("TextButton")
+deleteSpawnLocationsBtn.Text = "Delete All SpawnLocations"
+deleteSpawnLocationsBtn.Size = UDim2.new(0, 240, 0, 30)
+deleteSpawnLocationsBtn.Position = UDim2.new(0, 10, 0, 330)
+deleteSpawnLocationsBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+deleteSpawnLocationsBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+deleteSpawnLocationsBtn.TextSize = 14
+deleteSpawnLocationsBtn.Font = Enum.Font.SourceSansBold
+deleteSpawnLocationsBtn.Parent = frame
+deleteSpawnLocationsBtn.ZIndex = 2
+
+local cornerSpawnLoc = Instance.new("UICorner")
+cornerSpawnLoc.CornerRadius = UDim.new(0, 6)
+cornerSpawnLoc.Parent = deleteSpawnLocationsBtn
+
+local function deleteAllSpawnLocations()
+    for i = 1, 8 do
+        local spawnName = "Spawn"..i
+        local spawnPart = Workspace:FindFirstChild(spawnName)
+        if spawnPart then
+            local spawnLocation = spawnPart:FindFirstChild("SpawnLocation")
+            if spawnLocation then
+                spawnLocation:Destroy()
+            end
+        end
+    end
+    textbox.Text = "All SpawnLocations deleted"
+end
+
+deleteSpawnLocationsBtn.MouseButton1Click:Connect(deleteAllSpawnLocations)
+
+local deleteGrappleHooksBtn = Instance.new("TextButton")
+deleteGrappleHooksBtn.Text = "Delete GrappleHooks"
+deleteGrappleHooksBtn.Size = UDim2.new(0, 240, 0, 30)
+deleteGrappleHooksBtn.Position = UDim2.new(0, 10, 0, 250)
+deleteGrappleHooksBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+deleteGrappleHooksBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+deleteGrappleHooksBtn.TextSize = 14
+deleteGrappleHooksBtn.Font = Enum.Font.SourceSansBold
+deleteGrappleHooksBtn.Parent = frame
+deleteGrappleHooksBtn.ZIndex = 2
+
+local cornerGrapple = Instance.new("UICorner")
+cornerGrapple.CornerRadius = UDim.new(0, 6)
+cornerGrapple.Parent = deleteGrappleHooksBtn
+
+local function deleteAllGrappleHooksFromHand()
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local bow = character:FindFirstChild("OrnateGoldenBow")
+    if bow and bow:IsA("Tool") then
+        for _, child in pairs(bow:GetChildren()) do
+            if child:IsA("Part") and child.Name == "GrappleHook" then
+                child:Destroy()
+            end
+        end
+    end
+end
+
+deleteGrappleHooksBtn.MouseButton1Click:Connect(deleteAllGrappleHooksFromHand)
+
+local cleanTargetBtn = Instance.new("TextButton")
+cleanTargetBtn.Text = "Clean Target"
+cleanTargetBtn.Size = UDim2.new(0, 240, 0, 30)
+cleanTargetBtn.Position = UDim2.new(0, 10, 0, 290)
+cleanTargetBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+cleanTargetBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+cleanTargetBtn.TextSize = 14
+cleanTargetBtn.Font = Enum.Font.SourceSansBold
+cleanTargetBtn.Parent = frame
+cleanTargetBtn.ZIndex = 2
+
+local cornerClean = Instance.new("UICorner")
+cornerClean.CornerRadius = UDim.new(0, 6)
+cornerClean.Parent = cleanTargetBtn
+
+cleanTargetBtn.MouseButton1Click:Connect(resetTargetPosition)
+
+-- Player Target System
+local playerTargetBtn = Instance.new("TextButton")
+playerTargetBtn.Text = "Player Target ▼"
+playerTargetBtn.Size = UDim2.new(0, 240, 0, 30)
+playerTargetBtn.Position = UDim2.new(0, 10, 0, 370)
+playerTargetBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+playerTargetBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+playerTargetBtn.TextSize = 14
+playerTargetBtn.Font = Enum.Font.SourceSansBold
+playerTargetBtn.Parent = frame
+playerTargetBtn.ZIndex = 2
+
+local cornerPlayer = Instance.new("UICorner")
+cornerPlayer.CornerRadius = UDim.new(0, 6)
+cornerPlayer.Parent = playerTargetBtn
+
+local playerListFrame = Instance.new("Frame")
+playerListFrame.Size = UDim2.new(0, 240, 0, 0)
+playerListFrame.Position = UDim2.new(0, 10, 0, 400)
+playerListFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+playerListFrame.BackgroundTransparency = 0.3
+playerListFrame.Visible = false
+playerListFrame.Parent = frame
+playerListFrame.ZIndex = 3
+playerListFrame.ClipsDescendants = true
+
+local cornerPlayerList = Instance.new("UICorner")
+cornerPlayerList.CornerRadius = UDim.new(0, 6)
+cornerPlayerList.Parent = playerListFrame
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Padding = UDim.new(0, 2)
+playerListLayout.Parent = playerListFrame
+
+local playerListScroll = Instance.new("ScrollingFrame")
+playerListScroll.Size = UDim2.new(1, 0, 1, 0)
+playerListScroll.BackgroundTransparency = 1
+playerListScroll.ScrollBarThickness = 6
+playerListScroll.Parent = playerListFrame
+
+local playerListContainer = Instance.new("Frame")
+playerListContainer.Size = UDim2.new(1, 0, 0, 0)
+playerListContainer.BackgroundTransparency = 1
+playerListContainer.Parent = playerListScroll
+
+local playerListContainerLayout = Instance.new("UIListLayout")
+playerListContainerLayout.Padding = UDim.new(0, 2)
+playerListContainerLayout.Parent = playerListContainer
+playerListContainerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    playerListScroll.CanvasSize = UDim2.new(0, 0, 0, playerListContainerLayout.AbsoluteContentSize.Y)
+    playerListContainer.Size = UDim2.new(1, 0, 0, playerListContainerLayout.AbsoluteContentSize.Y)
+end)
+
+local playerButtons = {}
+local isPlayerListExpanded = false
+local trackedPlayer = nil
+local playerTrackingConnection = nil
+
+local function updatePlayerVisualPoint()
+    if not trackedPlayer or not _G.TargetVisualPoint then return end
+    
+    local character = trackedPlayer.Character
+    if not character then return end
+    
+    local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+    if torso then
+        _G.TargetVisualPoint.CFrame = CFrame.new(torso.Position)
+        _G.TargetPosition = torso.Position
+    end
+end
+
+local function stopTrackingPlayer()
+    if playerTrackingConnection then
+        playerTrackingConnection:Disconnect()
+        playerTrackingConnection = nil
+    end
+    
+    trackedPlayer = nil
+end
+
+local function trackPlayer(player)
+    stopTrackingPlayer()
+    
+    if not player or player == LocalPlayer then return end
+    
+    trackedPlayer = player
+    textbox.Text = "Tracking: " .. player.DisplayName
+    
+    playerTrackingConnection = RunService.Heartbeat:Connect(updatePlayerVisualPoint)
+    
+    local function onPlayerRemoving()
+        if trackedPlayer == player then
+            stopTrackingPlayer()
+            resetTargetPosition()
+        end
+    end
+    
+    player.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            onPlayerRemoving()
+        end
+    end)
+end
+
+local function refreshPlayerList()
+    for _, btn in ipairs(playerButtons) do
+        btn:Destroy()
+    end
+    playerButtons = {}
+    
+    local players = Players:GetPlayers()
+    table.sort(players, function(a, b)
+        return a.DisplayName:lower() < b.DisplayName:lower()
+    end)
+    
+    for _, player in ipairs(players) do
+        if player ~= LocalPlayer then
+            local btn = Instance.new("TextButton")
+            btn.Name = player.Name
+            btn.Text = player.DisplayName .. (player.DisplayName ~= player.Name and " (@"..player.Name..")" or "")
+            btn.Size = UDim2.new(0, 240, 0, 30)
+            btn.BackgroundColor3 = Color3.fromRGB(math.random(50, 200), math.random(50, 200), math.random(50, 200))
+            btn.BackgroundTransparency = 0.7
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextSize = 14
+            btn.Font = Enum.Font.SourceSansBold
+            btn.Parent = playerListContainer
+            btn.ZIndex = 4
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 4)
+            btnCorner.Parent = btn
+            
+            btn.MouseButton1Click:Connect(function()
+                if not _G.TargetVisualPoint then
+                    local part = Instance.new("Part")
+                    part.Anchored = true
+                    part.CanCollide = false
+                    part.Size = Vector3.new(0.8, 0.8, 0.8)
+                    part.Shape = Enum.PartType.Ball
+                    part.Material = Enum.Material.Neon
+                    part.Color = Color3.fromRGB(0, 255, 255)
+                    part.Transparency = 0.3
+                    part.Name = "TargetPointIndicator"
+                    part.Parent = Workspace
+                    _G.TargetVisualPoint = part
+                else
+                    _G.TargetVisualPoint.Color = Color3.fromRGB(0, 255, 255)
+                    _G.TargetVisualPoint.Size = Vector3.new(0.8, 0.8, 0.8)
+                end
+                
+                trackPlayer(player)
+                playerListFrame.Visible = false
+                isPlayerListExpanded = false
+                playerTargetBtn.Text = "Player Target ▼"
+                playerListFrame:TweenSize(UDim2.new(0, 240, 0, 0), "Out", "Quad", 0.2, true)
+            end)
+            
+            btn.MouseEnter:Connect(function()
+                btn.BackgroundTransparency = 0.4
+            end)
+            
+            btn.MouseLeave:Connect(function()
+                btn.BackgroundTransparency = 0.7
+            end)
+            
+            table.insert(playerButtons, btn)
+        end
+    end
+end
+
+playerTargetBtn.MouseButton1Click:Connect(function()
+    isPlayerListExpanded = not isPlayerListExpanded
+    playerListFrame.Visible = isPlayerListExpanded
+    
+    if isPlayerListExpanded then
+        refreshPlayerList()
+        playerTargetBtn.Text = "Player Target ▲"
+        playerListFrame.Size = UDim2.new(0, 240, 0, 0)
+        playerListFrame:TweenSize(
+            UDim2.new(0, 240, 0, math.min(160, #Players:GetPlayers() * 32)),
+            "Out", "Quad", 0.2, true
+        )
+    else
+        playerTargetBtn.Text = "Player Target ▼"
+        playerListFrame:TweenSize(
+            UDim2.new(0, 240, 0, 0),
+            "Out", "Quad", 0.2, true,
+            function()
+                playerListFrame.Visible = false
+            end
+        )
+    end
+end)
+
+local function onPlayerAdded(player)
+    if isPlayerListExpanded then
+        refreshPlayerList()
+    end
+end
+
+local function onPlayerRemoving(player)
+    if player == trackedPlayer then
+        stopTrackingPlayer()
+        resetTargetPosition()
+    end
+    if isPlayerListExpanded then
+        refreshPlayerList()
+    end
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+-- MagnitudeCheck dropdown system
+local spawnColorNames = {
+    ["Spawn1"] = "Blue",
+    ["Spawn2"] = "Light Blue", 
+    ["Spawn3"] = "Green",
+    ["Spawn4"] = "Yellow",
+    ["Spawn5"] = "Orange",
+    ["Spawn6"] = "Pink",
+    ["Spawn7"] = "Purple",
+    ["Spawn8"] = "Red"
+}
+
+local spawnColors = {
+    ["Spawn1"] = Color3.fromRGB(0, 162, 255),
+    ["Spawn2"] = Color3.fromRGB(102, 204, 255),
+    ["Spawn3"] = Color3.fromRGB(0, 255, 0),
+    ["Spawn4"] = Color3.fromRGB(255, 255, 0),
+    ["Spawn5"] = Color3.fromRGB(255, 128, 0),
+    ["Spawn6"] = Color3.fromRGB(255, 102, 178),
+    ["Spawn7"] = Color3.fromRGB(178, 102, 255),
+    ["Spawn8"] = Color3.fromRGB(255, 0, 0)
+}
+
+local magnitudeCheckBtn = Instance.new("TextButton")
+magnitudeCheckBtn.Text = "MagnitudeCheck ▼"
+magnitudeCheckBtn.Size = UDim2.new(0, 240, 0, 30)
+magnitudeCheckBtn.Position = UDim2.new(0, 10, 0, 410)
+magnitudeCheckBtn.BackgroundColor3 = Color3.fromRGB(140, 140, 140)
+magnitudeCheckBtn.TextColor3 = Color3.fromRGB(60, 60, 60)
+magnitudeCheckBtn.TextSize = 14
+magnitudeCheckBtn.Font = Enum.Font.SourceSansBold
+magnitudeCheckBtn.Parent = frame
+magnitudeCheckBtn.ZIndex = 2
+
+local cornerMag = Instance.new("UICorner")
+cornerMag.CornerRadius = UDim.new(0, 6)
+cornerMag.Parent = magnitudeCheckBtn
+
+local spawnListFrame = Instance.new("Frame")
+spawnListFrame.Size = UDim2.new(0, 240, 0, 0)
+spawnListFrame.Position = UDim2.new(0, 10, 0, 440)
+spawnListFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+spawnListFrame.BackgroundTransparency = 0.3
+spawnListFrame.Visible = false
+spawnListFrame.Parent = frame
+spawnListFrame.ZIndex = 3
+spawnListFrame.ClipsDescendants = true
+
+local cornerList = Instance.new("UICorner")
+cornerList.CornerRadius = UDim.new(0, 6)
+cornerList.Parent = spawnListFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 2)
+listLayout.Parent = spawnListFrame
+
+local spawnButtons = {}
+local isListExpanded = false
+
+local function createVisualPoint(position)
+    if _G.TargetVisualPoint then
+        _G.TargetVisualPoint:Destroy()
+        _G.TargetVisualPoint = nil
+    end
+    
+    local part = Instance.new("Part")
+    part.Anchored = true
+    part.CanCollide = false
+    part.Size = Vector3.new(0.5, 0.5, 0.5)
+    part.Shape = Enum.PartType.Ball
+    part.Material = Enum.Material.Neon
+    part.Color = Color3.fromRGB(255, 0, 0)
+    part.CFrame = CFrame.new(position)
+    part.Name = "TargetPointIndicator"
+    part.Transparency = 0.5
+    part.Parent = Workspace
+    _G.TargetVisualPoint = part
+end
+
+for i = 1, 8 do
+    local spawnName = "Spawn"..i
+    local btn = Instance.new("TextButton")
+    btn.Name = spawnName
+    btn.Text = spawnName .. " (" .. spawnColorNames[spawnName] .. ")"
+    btn.Size = UDim2.new(0, 240, 0, 30)
+    btn.BackgroundColor3 = spawnColors[spawnName]
+    btn.BackgroundTransparency = 0.7
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.SourceSansBold
+    btn.Parent = spawnListFrame
+    btn.ZIndex = 4
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 4)
+    btnCorner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(function()
+        local spawnPart = Workspace:FindFirstChild(spawnName)
+        if spawnPart then
+            local magnitudeCheck = spawnPart:FindFirstChild("MagnitudeCheck")
+            if magnitudeCheck then
+                stopTrackingPlayer()
+                _G.TargetPosition = magnitudeCheck.Position
+                targetSetTime = tick()
+                createVisualPoint(_G.TargetPosition)
+                savedPart = magnitudeCheck
+                savedPartCFrame = magnitudeCheck.CFrame
+                textbox.Text = string.format("CFrame: (%.1f, %.1f, %.1f)", 
+                    _G.TargetPosition.X, _G.TargetPosition.Y, _G.TargetPosition.Z)
+            else
+                textbox.Text = "MagnitudeCheck not found in " .. spawnName
+            end
+        else
+            textbox.Text = spawnName .. " not found in Workspace"
+        end
+        spawnListFrame.Visible = false
+        isListExpanded = false
+        magnitudeCheckBtn.Text = "MagnitudeCheck ▼"
+        spawnListFrame:TweenSize(UDim2.new(0, 240, 0, 0), "Out", "Quad", 0.2, true)
+    end)
+    
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundTransparency = 0.4
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundTransparency = 0.7
+    end)
+    
+    table.insert(spawnButtons, btn)
+end
+
+magnitudeCheckBtn.MouseButton1Click:Connect(function()
+    isListExpanded = not isListExpanded
+    spawnListFrame.Visible = isListExpanded
+    
+    if isListExpanded then
+        magnitudeCheckBtn.Text = "MagnitudeCheck ▲"
+        spawnListFrame.Size = UDim2.new(0, 240, 0, 0)
+        spawnListFrame:TweenSize(
+            UDim2.new(0, 240, 0, #spawnButtons * 32),
+            "Out", "Quad", 0.2, true
+        )
+    else
+        magnitudeCheckBtn.Text = "MagnitudeCheck ▼"
+        spawnListFrame:TweenSize(
+            UDim2.new(0, 240, 0, 0),
+            "Out", "Quad", 0.2, true,
+            function()
+                spawnListFrame.Visible = false
+            end
+        )
+    end
+end)
+
+destroyBtn.MouseButton1Click:Connect(function()
+    if screenGui then
+        screenGui:Destroy()
+    end
+
+    local connections = {
+        inputConnection, heartbeatConnection, charAddedConnection,
+        playerAddedConnection, ropeConnection, toolWatchConnection,
+        charListener, torsoListener, playerTrackingConnection
+    }
+    
+    for _, conn in ipairs(connections) do
+        if conn then
+            conn:Disconnect()
+        end
+    end
+    
+    for _, conn in pairs(backpackCleanConnections) do
+        if conn then
+            conn:Disconnect()
+        end
+    end
+    backpackCleanConnections = {}
+
+    resetTargetPosition()
+    stopTrackingPlayer()
+end)
+
+_G.TargetPosition = nil
+local targetSetTime = 0
+local savedPart = nil
+local savedPartCFrame = nil
+
+inputConnection = UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        local target = Mouse.Target
+        if target then
+            stopTrackingPlayer()
+            _G.TargetPosition = Mouse.Hit.Position
+            targetSetTime = tick()
+            createVisualPoint(_G.TargetPosition)
+            savedPart = target
+            savedPartCFrame = target.CFrame
+            textbox.Text = string.format("CFrame: (%.1f, %.1f, %.1f)", _G.TargetPosition.X, _G.TargetPosition.Y, _G.TargetPosition.Z)
+        end
+    end
+end)
+
+local function getTargetPositionCFrame()
+    if trackedPlayer and trackedPlayer.Character then
+        local torso = trackedPlayer.Character:FindFirstChild("Torso") or trackedPlayer.Character:FindFirstChild("UpperTorso")
+        if torso then
+            return CFrame.new(torso.Position)
+        end
+    end
+    return _G.TargetPosition and CFrame.new(_G.TargetPosition) or nil
+end
+
+local function teleportGrappleHook(grappleHook)
+    if not grappleHook or not grappleHook.Parent then return end
+    
+    local targetCFrame = getTargetPositionCFrame()
+    if not targetCFrame then return end
+    
+    if (grappleHook:GetAttribute("LastTeleported") or 0) + 0.1 > tick() then
+        return
+    end
+    
+    grappleHook:SetAttribute("LastTeleported", tick())
+    
+    pcall(function()
+        grappleHook.CFrame = targetCFrame
+    end)
+    
+    if savedPart and savedPartCFrame and savedPart.Parent then
+        task.delay(2, function()
+            if savedPart and savedPart.Parent then
+                pcall(function()
+                    savedPart.CFrame = savedPartCFrame
+                end)
+            end
+        end)
+    end
+end
+
+local function checkGrappleHookWeld(grappleHook)
+    if not grappleHook or not grappleHook.Parent then return false end
+    
+    local welds = {}
+    for _, child in pairs(grappleHook:GetChildren()) do
+        if child:IsA("Weld") then
+            table.insert(welds, child)
+        end
+    end
+
+    if #welds == 2 then
+        local part0_1, part1_1 = welds[1].Part0, welds[1].Part1
+        local part0_2, part1_2 = welds[2].Part0, welds[2].Part1
+        
+        local handleFound = false
+        if (part0_1 and part0_1.Name == "Handle") or (part1_1 and part1_1.Name == "Handle") then
+            handleFound = true
+        end
+        if (part0_2 and part0_2.Name == "Handle") or (part1_2 and part1_2.Name == "Handle") then
+            handleFound = true
+        end
+        
+        return handleFound
+    end
+    return false
+end
+
+local function continuouslyCleanBowInBackpack(bow)
+    if backpackCleanConnections[bow] then
+        backpackCleanConnections[bow]:Disconnect()
+    end
+    
+    backpackCleanConnections[bow] = RunService.Heartbeat:Connect(function()
+        if bow and bow.Parent == LocalPlayer:FindFirstChild("Backpack") then
+            for _, child in ipairs(bow:GetChildren()) do
+                if child:IsA("Part") and child.Name == "GrappleHook" then
+                    child:Destroy()
+                end
+            end
+        elseif not bow or not bow:IsDescendantOf(game) then
+            if backpackCleanConnections[bow] then
+                backpackCleanConnections[bow]:Disconnect()
+                backpackCleanConnections[bow] = nil
+            end
+        end
+    end)
+end
+
+local function watchTool(tool)
+    if not tool then return end
+    
+    for _, desc in ipairs(tool:GetDescendants()) do
+        if desc:IsA("Part") and desc.Name == "GrappleHook" then
+            teleportGrappleHook(desc)
+        end
+    end
+    
+    tool.DescendantAdded:Connect(function(desc)
+        if desc:IsA("Part") and desc.Name == "GrappleHook" then
+            if targetSetTime <= tick() then
+                teleportGrappleHook(desc)
+            end
+            
+            for i = 1, 3 do
+                task.delay(i * 0.15, function()
+                    if desc and desc.Parent and not checkGrappleHookWeld(desc) then
+                        teleportGrappleHook(desc)
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+local sourceModel = Workspace:FindFirstChild("Softik_875") or Workspace:WaitForChild("Softik_875", 10)
+
+local function watchForTool()
+    if not sourceModel then return end
+    
+    local function tryWatch()
+        local tool = sourceModel:FindFirstChild("OrnateGoldenBow")
+        if tool then
+            watchTool(tool)
+            continuouslyCleanBowInBackpack(tool)
+        end
+    end
+    
+    tryWatch()
+    
+    sourceModel.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") and child.Name == "OrnateGoldenBow" then
+            watchTool(child)
+            continuouslyCleanBowInBackpack(child)
+        end
+    end)
+end
+
+local function watchAndRemoveRope()
+    if not sourceModel then return end
+    
+    local bow = sourceModel:FindFirstChild("OrnateGoldenBow")
+    if bow then
+        bow.ChildAdded:Connect(function(child)
+            if child.Name == "Rope" then
+                child:Destroy()
+            end
+        end)
+    end
+    
+    sourceModel.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") and child.Name == "OrnateGoldenBow" then
+            child.ChildAdded:Connect(function(rope)
+                if rope.Name == "Rope" then
+                    rope:Destroy()
+                end
+            end)
+        end
+    end)
+end
+
+playerAddedConnection = Players.PlayerAdded:Connect(function(player)
+    if player.Name == "Softik_875" then
+        player.CharacterAdded:Connect(function(char)
+            sourceModel = char
+            watchForTool()
+            watchAndRemoveRope()
+        end)
+    end
+end)
+
+if sourceModel then
+    watchForTool()
+    watchAndRemoveRope()
+end
+
+
+heartbeatConnection = RunService.Heartbeat:Connect(function()
+    if not sourceModel then return end
+    
+    local foundGrapple = false
+    for _, tool in pairs(sourceModel:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name == "OrnateGoldenBow" then
+            for _, child in pairs(tool:GetChildren()) do
+                if child:IsA("Part") and child.Name == "GrappleHook" then
+                    local welds = {}
+                    for _, weld in pairs(child:GetChildren()) do
+                        if weld:IsA("Weld") then
+                            table.insert(welds, weld)
+                        end
+                    end
+                    
+                    if #welds == 2 then
+                        local part1Name = welds[1].Part0 and welds[1].Part0.Name or "None"
+                        local part2Name = welds[2].Part0 and welds[2].Part0.Name or "None"
+                        weldInfoBox.Text = string.format("Welded To:\n1: %s\n2: %s", part1Name, part2Name)
+                        foundGrapple = true
+                    end
+                end
+            end
+        end
+    end
+    
+    if not foundGrapple then
+        weldInfoBox.Text = "Weld Info: N/A"
+    end
+end)
 
 keycodeMap = {
     ["0"] = 0x30,
