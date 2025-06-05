@@ -13561,6 +13561,403 @@ addcmd('IvoryPeriastron', {'iperiastron'}, function(args, speaker)
     end
 end)
 
+addcmd('grappletp', {'gtp'}, function(args, speaker)
+    if speaker ~= game.Players.LocalPlayer then return end
+    local Players = game:GetService("Players")
+    local UIS     = game:GetService("UserInputService")
+    local RS      = game:GetService("RunService")
+    local WS      = game:GetService("Workspace")
+    local plr     = Players.LocalPlayer
+    local mouse   = plr:GetMouse()
+
+    -- режимы: 0 = свободная точка, 1 = центр блока, 2 = наблюдательный, 3 = проекция
+    local mode = 0
+    local savedPart, savedPos
+    local highlight, indicatorRod
+    local currentProjection -- Текущая проекция
+    local isProjectionFixed = false -- Фиксирована ли проекция
+    local moveStepY = 1 -- Шаг перемещения по Y
+    local rotateAxis, rotateStep = Vector3.new(0, 1, 0), math.rad(15)
+    local initialRotation -- Исходное вращение для сброса
+
+    -- GUI
+    local gui = Instance.new("ScreenGui", plr.PlayerGui)
+    gui.Name = "GrappleTPGui"
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0, 360, 0, 520)
+    frame.Position = UDim2.new(0, 200, 0, 40)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    frame.BackgroundTransparency = 0.3
+    frame.Active = true
+    frame.Draggable = true
+
+    -- Заголовок и поле Target
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.SourceSansBold
+    title.TextSize = 18
+    local function updateTitle()
+        title.Text = ("GrappleTP; Mode %d"):format(mode)
+    end
+    updateTitle()
+
+    local targetBox = Instance.new("TextLabel", frame)
+    targetBox.Text = "Target: None"
+    targetBox.Size = UDim2.new(1, -20, 0, 25)
+    targetBox.Position = UDim2.new(0, 10, 0, 35)
+    targetBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    targetBox.TextColor3 = Color3.new(1, 1, 1)
+    targetBox.Font = Enum.Font.SourceSans
+    targetBox.TextSize = 14
+
+    -- Фреймы для режимов
+    local ctrlF = Instance.new("Frame", frame)
+    ctrlF.Size = UDim2.new(1, -20, 0, 180)
+    ctrlF.Position = UDim极.new(0, 10, 0, 75)
+    ctrlF.BackgroundTransparency = 1
+    local ctrlLayout = Instance.new("UIGridLayout", ctrlF)
+    ctrlLayout.CellSize = UDim2.new(0, 100, 0, 35)
+    ctrlLayout.CellPadding = UDim2.new(0, 5, 0, 5)
+
+    local obsF = Instance.new("Frame", frame)
+    obsF.Size = UDim2.new(1, -20, 0, 180)
+    obsF.Position = UDim2.new(0, 10, 0, 75)
+    obsF.BackgroundTransparency = 1
+    local obsLayout = Instance.new("UIGridLayout", obsF)
+    obsLayout.CellSize = UDim2.new(0, 80, 0, 30)
+    obsLayout.CellPadding = UDim2.new(0, 5, 0, 5)
+
+    local projF = Instance.new("Frame", frame)
+    projF.Size = UDim2.new(1, -20, 0, 300)
+    projF.Position = UDim2.new(0, 10, 0, 75)
+    projF.BackgroundTransparency = 1
+    local projLayout = Instance.new("UIGridLayout", projF)
+    projLayout.CellSize = UDim2.new(0, 100, 0, 35)
+    projLayout.CellPadding = UDim2.new(0, 5, 0, 5)
+
+    -- Поля для ввода (режим 3)
+    local degBox = Instance.new("TextBox", frame)
+    deg极.PlaceholderText = "Angle°"
+    degBox.Size = UDim2.new(0, 80, 0, 25)
+    degBox.Position = UDim2.new(0, 270, 0, 35)
+    degBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    degBox.Text = "15"
+    degBox.ClearTextOnFocus = true
+    degBox.TextColor3 = Color3.new(1, 1, 1)
+    degBox.Font = Enum.Font.SourceSans
+    degBox.TextSize = 14
+    degBox.FocusLost:Connect(function()
+        local v = tonumber(degBox.Text)
+        if v then
+            rotateStep = math.rad(v)
+        end
+        degBox.Text = tostring(math.deg(rotateStep))
+    end)
+
+    -- Поле для шага перемещения по Y
+    local yStepBox = Instance.new("TextBox", frame)
+    yStepBox.PlaceholderText = "Y Step"
+    yStepBox.Size = UDim2.new(0, 80, 0, 25)
+    yStepBox.Position = UDim2.new(0, 270, 0, 65)
+    yStepBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    yStepBox.Text = "1"
+    yStepBox.ClearTextOnFocus = true
+    yStepBox.TextColor3 = Color3.new(1, 1, 1)
+    yStepBox.Font = Enum.Font.SourceSans
+    yStepBox.TextSize = 14
+    yStepBox.FocusLost:Connect(function()
+        local v = tonumber(yStepBox.Text)
+        if v then
+            moveStepY = v
+        end
+        yStepBox.Text = tostring(moveStepY)
+    end)
+
+    local function makeBtn(parent, txt, col, cb)
+        local b = Instance.new("TextButton", parent)
+        b.Text = txt
+        b.Size = UDim2.new(0, 100, 0, 35)
+        b.BackgroundColor3 = col
+        b.Font = Enum.Font.SourceSansBold
+        b.TextSize = 14
+        b.MouseButton1Click:Connect(cb)
+        return b
+    end
+
+    local function updateVisibility()
+        ctrlF.Visible = (mode < 2)
+        obsF.Visible  = (mode == 2)
+        projF.Visible = (mode == 3)
+        degBox.Visible = (mode == 3)
+        yStepBox.Visible = (mode == 3)
+    end
+
+    -- Кнопки режима 0/1
+    makeBtn(ctrlF, "Return", Color3.fromRGB(150, 255, 150), function()
+        local h = plr.Character and plr.Character:FindFirstChild("Humanoid")
+        if h then
+            WS.CurrentCamera.CameraSubject = h
+        end
+    end)
+
+    makeBtn(ctrlF, "Switch", Color3.fromRGB(128, 0, 128), function()
+        mode = (mode + 1) % 4
+        updateTitle()
+        updateVisibility()
+    end)
+
+    makeBtn(ctrlF, "Save", Color3.fromRGB(255, 165, 0), function()
+        if savedPart then
+            savedPos = (mode == 0 and mouse.Hit.Position) or savedPart.Position
+            notify("Сохранена позиция")
+        end
+    end)
+
+    makeBtn(ctrlF, "TpCtr", Color3.fromRGB(0, 200, 255), function()
+        if mode == 1 and savedPart then
+            local hrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = CFrame.new(savedPart.Position + Vector3.new(0, savedPart.Size.Y/2 + 2, 0))
+            end
+        end
+    end)
+
+    makeBtn(ctrlF, "Back", Color3.fromRGB(255, 255, 0), function()
+        if savedPos and savedPart then
+            savedPart.CFrame = CFrame.new(savedPos)
+        end
+    end)
+
+    makeBtn(ctrlF, "GetVel", Color3.fromRGB(255, 0, 0), function()
+        execCmd("getvelocity")
+    end)
+
+    makeBtn(ctrlF, "Ivory", Color3.fromRGB(255, 255, 255), function()
+        execCmd("IvoryPeriastron")
+    end)
+
+    makeBtn(ctrlF, "Destroy", Color3.fromRGB(255, 100, 100), function()
+        gui:Destroy()
+    end)
+
+    -- Кнопки режима 2
+    makeBtn(obsF, "Switch", Color3.fromRGB(128, 0, 128), function()
+        mode = (mode + 1) % 4
+        updateTitle()
+        updateVisibility()
+    end)
+
+    makeBtn(obsF, "Return", Color3.fromRGB(150, 255, 150), function()
+        local h = plr.Character and plr.Character:FindFirstChild("Humanoid")
+        if h then
+            WS.CurrentCamera.CameraSubject = h
+        end
+    end)
+
+    makeBtn(obsF, "GetVel", Color3.fromRGB(255, 0, 0), function()
+        execCmd("getvelocity")
+    end)
+
+    for i = 1, 8 do
+        makeBtn(obsF, "Mag" .. i, Color3.fromRGB(100, 100, 255), function()
+            local s = WS:FindFirstChild("Spawn" .. i)
+            if s then
+                WS.CurrentCamera.CameraSubject = s:FindFirstChild("MagnitudeCheck") or s
+            end
+        end)
+    end
+
+    -- Кнопки режима 3
+    makeBtn(projF, "Switch", Color3.fromRGB(128, 0, 极), function()
+        mode = (mode + 1) % 4
+        updateTitle()
+        updateVisibility()
+    end)
+
+    makeBtn(projF, "Create", Color3.fromRGB(0, 200, 255), function()
+        if savedPart and indicatorRod then
+            -- Удаляем старую проекцию
+            if currentProjection then
+                currentProjection:Destroy()
+            end
+            
+            -- Создаем новую проекцию
+            currentProjection = savedPart:Clone()
+            currentProjection.Parent = WS
+            currentProjection.Transparency = 0.5
+            currentProjection.CanCollide = false
+            currentProjection.CFrame = indicatorRod.CFrame
+            isProjectionFixed = false
+            initialRotation = currentProjection.CFrame.Rotation
+            notify("Проекция создана")
+        end
+    end)
+
+    makeBtn(projF, "ClearAll", Color3.fromRGB(255, 0, 255), function()
+        if currentProjection then
+            currentProjection:Destroy()
+            currentProjection = nil
+        end
+        notify("Проекция удалена")
+    end)
+
+    makeBtn(projF, "Ivory", Color3.fromRGB(255, 255, 255), function()
+        execCmd("IvoryPeriastron")
+    end)
+
+    -- Кнопки осей вращения
+    makeBtn(projF, "Axis: X", Color3.fromRGB(255, 100, 100), function()
+        rotateAxis = Vector3.new(1, 0, 0)
+        notify("Ось вращения: X")
+    end)
+    
+    makeBtn(projF, "Axis: Y", Color3.fromRGB(100, 255, 100), function()
+        rotateAxis = Vector3.new(0, 1, 0)
+        notify("Ось вращения: Y")
+    end)
+    
+    makeBtn(projF, "Axis: Z", Color3.fromRGB(100, 100, 255), function()
+        rotateAxis = Vector3.new(0, 0, 1)
+        notify("Ось вращения: Z")
+    end)
+    
+    -- Кнопка сброса вращения
+    makeBtn(projF, "Reset Rot", Color3.fromRGB(200, 200, 0), function()
+        if currentProjection and initialRotation then
+            currentProjection.CFrame = CFrame.new(currentProjection.Position) * initialRotation
+            notify("Вращение сброшено")
+        end
+    end)
+
+    -- Кнопки углов вращения
+    for _, d in ipairs({1, 15, 30, 60, 90}) do
+        makeBtn(projF, tostring(d) .. "°", Color3.fromRGB(200, 200, 200), function()
+            rotateStep = math.rad(d)
+            notify("Угол вращения: " .. d .. "°")
+        end)
+    end
+
+    updateVisibility()
+
+    -- Функция для получения позиции HRP
+    local function getHrpY()
+        local hrp = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+        return hrp and hrp.Position.Y or (savedPos and savedPos.Y or 0)
+    end
+
+    -- Выбор точки Ctrl + ПКМ
+    UIS.InputBegan:Connect(function(inp, proc)
+        if proc then return end
+        if inp.UserInputType == Enum.UserInputType.MouseButton2
+           and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+            local t = mouse.Target
+            if t and t:IsA("BasePart") then
+                savedPart = t
+                savedPos = (mode == 0 and mouse.Hit.Position) or t.Position
+                targetBox.Text = "Target: " .. t.Name
+                if highlight then
+                    highlight:Destroy()
+                end
+                highlight = Instance.new("Highlight", t)
+                highlight.FillColor = Color3.new(1, 0, 0)
+                highlight.OutlineTransparency = 1
+                if indicatorRod then
+                    indicatorRod:Destroy()
+                end
+                
+                -- Создаем индикаторную палку
+                indicatorRod = Instance.new("Part", WS)
+                indicatorRod.Name = "IndicatorRod"
+                indicatorRod.Anchored = true
+                indicatorRod.CanCollide = false
+                indicatorRod.Size = Vector3.new(0.1, 1000, 0.1)
+                indicatorRod.Color = Color3.fromRGB(0, 0, 255)
+                indicatorRod.Transparency = 0.7
+                
+                -- Установка на уровень HRP
+                indicatorRod.CFrame = CFrame.new(
+                    savedPos.X, 
+                    getHrpY(), 
+                    savedPos.Z
+                )
+                
+                if mode == 2 then
+                    WS.CurrentCamera.CameraSubject = t:FindFirstChild("MagnitudeCheck") or t
+                end
+                
+                notify("Цель выбрана: " .. t.Name)
+            end
+        end
+    end)
+
+    -- GrappleHook: автотелепорт в режимах 0–2
+    WS.DescendantAdded:Connect(function(desc)
+        if desc:IsA("Part") and desc.Name == "GrappleHook"
+           and mode < 3 and savedPos then
+            task.delay(0.1, function()
+                desc.CFrame = CFrame.new(savedPos)
+            end)
+        end
+    end)
+
+    -- Движение индикаторной палки (режим 3)
+    RS.RenderStepped:Connect(function()
+        if mode == 3 and indicatorRod then
+            -- Обновляем позицию палки
+            local ray = WS.CurrentCamera:ScreenPointToRay(mouse.X, mouse.Y)
+            local t = (getHrpY() - ray.Origin.Y) / ray.Direction.Y
+            local pos = ray.Origin + ray.Direction * t
+            
+            -- Устанавливаем новую позицию с сохранением высоты HRP
+            indicatorRod.Position = Vector3.new(pos.X, getHrpY(), pos.Z)
+            
+            -- Если есть проекция и она не зафиксирована - обновляем ее позицию
+            if currentProjection and not isProjectionFixed then
+                currentProjection.Position = Vector3.new(pos.X, currentProjection.Position.Y, pos.Z)
+            end
+        end
+    end)
+
+    -- Обработка клавиш
+    UIS.InputBegan:Connect(function(inp, gp)
+        if gp or mode ~= 3 then return end
+        
+        -- Вращение палки
+        if inp.KeyCode == Enum.KeyCode.R and indicatorRod then
+            indicatorRod.CFrame = indicatorRod.CFrame * CFrame.fromAxisAngle(rotateAxis, rotateStep)
+            
+            -- Если проекция не зафиксирована - вращаем вместе с палкой
+            if currentProjection and not isProjectionFixed then
+                currentProjection.CFrame = currentProjection.CFrame * CFrame.fromAxisAngle(rotateAxis, rotateStep)
+            end
+        
+        -- Фиксация/расфиксация проекции
+        elseif inp.KeyCode == Enum.KeyCode.Z then
+            if currentProjection then
+                isProjectionFixed = not isProjectionFixed
+                notify(isProjectionFixed and "Проекция зафиксирована" or "Проекция расфиксирована")
+            end
+        
+        -- Перемещение проекции по Y
+        elseif inp.KeyCode == Enum.KeyCode.E then
+            if currentProjection then
+                currentProjection.Position += Vector3.new(0, moveStepY, 0)
+            end
+        
+        elseif inp.KeyCode == Enum.KeyCode.Q then
+            if currentProjection then
+                currentProjection.Position -= Vector3.new(0, moveStepY, 0)
+            end
+        end
+    end)
+
+    notify("GrappleTP activated. Mode " .. mode)
+end)
+
+
 local inputConnection
 local heartbeatConnection
 local charAddedConnection
