@@ -7059,18 +7059,7 @@ local mobilefly = function(speaker, vfly)
     end)
 end
 
-addcmd('fly',{},function(args, speaker)
-    if not IsOnMobile then
-        NOFLY()
-        wait()
-        sFLY()
-    else
-        mobilefly(speaker)
-    end
-    if args[1] and isNumber(args[1]) then
-        iyflyspeed = args[1]
-    end
-end)
+
 
 addcmd('flyspeed',{'flysp'},function(args, speaker)
     local speed = args[1] or 1
