@@ -13260,7 +13260,85 @@ addcmd('BS', {'BoneSword'}, function(args, speaker)
     end
 end)
 
+addcmd('activateE',{'acte'},function(args, speaker)
+    -- Получаем персонажа игрока
+    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    
+    -- Ищем все инструменты (Tools), которые находятся у персонажа
+    local tools = {}
+    for _, child in ipairs(character:GetChildren()) do
+        if child:IsA("Tool") then
+            table.insert(tools, child)
+        end
+    end
+    
+    -- Выполняем событие Remote для каждого инструмента
+    for i, tool in ipairs(tools) do
+        -- Ищем Remote в инструменте
+        local remote = tool:FindFirstChild("Remote")
+        if remote then
+            -- Параметры события
+            local args = {
+                [1] = Enum.KeyCode.E -- Используем клавишу E как аргумент
+            }
+    
+            -- Вызываем событие Remote
+            remote:FireServer(unpack(args))
+            print(i .. "-й инструмент использован:", tool.Name)
+        else
+            print("Remote не найден у инструмента:", tool.Name)
+        end
+    end
 
+end)
+
+addcmd('IvoryPeriastron', {'iperiastron'}, function(args, speaker)
+    if not speaker or not speaker.Character then
+        notify("Ошибка: персонаж не найден!")
+        return
+    end
+
+    -- Находим любой IvoryPeriastron с Remote
+    local function findActiveIvory()
+        for _, container in ipairs({speaker.Character, speaker.Backpack, workspace}) do
+            for _, tool in ipairs(container:GetChildren()) do
+                if tool:IsA("Tool") and tool.Name == "IvoryPeriastron" then
+                    if tool:FindFirstChild("Remote") or tool:FindFirstChildOfClass("RemoteEvent") then
+                        return tool
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
+    local ivory = findActiveIvory()
+    if not ivory then
+        notify("Ошибка: IvoryPeriastron не найден!")
+        return
+    end
+
+    -- Экипируем
+    ivory.Parent = speaker.Character
+    notify("IvoryPeriastron экипирован")
+
+    -- Активируем
+    execCmd('actE')
+
+    -- Удаляем все лишние копии IvoryPeriastron
+    local found = false
+    for _, container in ipairs({speaker.Character, speaker.Backpack}) do
+        for _, tool in ipairs(container:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name == "IvoryPeriastron" then
+                if not found then
+                    found = true  -- оставляем первую копию
+                else
+                    tool:Destroy()  -- удаляем все последующие
+                end
+            end
+        end
+    end
+end)
 
 
 
