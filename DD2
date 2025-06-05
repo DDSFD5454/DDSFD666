@@ -13561,6 +13561,7 @@ addcmd('IvoryPeriastron', {'iperiastron'}, function(args, speaker)
     end
 end)
 
+
 addcmd('grappletp', {'gtp'}, function(args, speaker)
     if speaker ~= game.Players.LocalPlayer then return end
     local Players = game:GetService("Players")
@@ -13596,7 +13597,7 @@ addcmd('grappletp', {'gtp'}, function(args, speaker)
     title.Size = UDim2.new(1, 0, 0, 30)
     title.Position = UDim2.new(0, 0, 0, 0)
     title.BackgroundTransparency = 1
-    title.TextColor3 = Color3.new(1, 1, 1)
+    title.TextColor3 = Color3.new(1, 1, 极)
     title.Font = Enum.Font.SourceSansBold
     title.TextSize = 18
     local function updateTitle()
@@ -13616,7 +13617,7 @@ addcmd('grappletp', {'gtp'}, function(args, speaker)
     -- Фреймы для режимов
     local ctrlF = Instance.new("Frame", frame)
     ctrlF.Size = UDim2.new(1, -20, 0, 180)
-    ctrlF.Position = UDim极.new(0, 10, 0, 75)
+    ctrlF.Position = UDim2.new(0, 10, 0, 75) -- Исправлено
     ctrlF.BackgroundTransparency = 1
     local ctrlLayout = Instance.new("UIGridLayout", ctrlF)
     ctrlLayout.CellSize = UDim2.new(0, 100, 0, 35)
@@ -13640,7 +13641,7 @@ addcmd('grappletp', {'gtp'}, function(args, speaker)
 
     -- Поля для ввода (режим 3)
     local degBox = Instance.new("TextBox", frame)
-    deg极.PlaceholderText = "Angle°"
+    degBox.PlaceholderText = "Angle°" -- Исправлено
     degBox.Size = UDim2.new(0, 80, 0, 25)
     degBox.Position = UDim2.new(0, 270, 0, 35)
     degBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -13660,7 +13661,7 @@ addcmd('grappletp', {'gtp'}, function(args, speaker)
     -- Поле для шага перемещения по Y
     local yStepBox = Instance.new("TextBox", frame)
     yStepBox.PlaceholderText = "Y Step"
-    yStepBox.Size = UDim2.new(0, 80, 0, 25)
+    y极Box.Size = UDim2.new(0, 80, 0, 25)
     yStepBox.Position = UDim2.new(0, 270, 0, 65)
     yStepBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     yStepBox.Text = "1"
@@ -13771,7 +13772,7 @@ addcmd('grappletp', {'gtp'}, function(args, speaker)
     end
 
     -- Кнопки режима 3
-    makeBtn(projF, "Switch", Color3.fromRGB(128, 0, 极), function()
+    makeBtn(projF, "Switch", Color3.fromRGB(128, 0, 128), function() -- Исправлено
         mode = (mode + 1) % 4
         updateTitle()
         updateVisibility()
@@ -13955,6 +13956,24 @@ addcmd('grappletp', {'gtp'}, function(args, speaker)
     end)
 
     notify("GrappleTP activated. Mode " .. mode)
+end)
+
+addcmd('getvelocity', {'gv'}, function(args, speaker)
+    -- Просто удаляем все силовые объекты у персонажа
+    for i, v in pairs(speaker.Character:GetDescendants()) do
+        if v:IsA("BodyVelocity") 
+        or v:IsA("BodyGyro") 
+        or v:IsA("RocketPropulsion") 
+        or v:IsA("BodyThrust") 
+        or v:IsA("BodyAngularVelocity") 
+        or v:IsA("AngularVelocity") 
+        or v:IsA("BodyForce") 
+        or v:IsA("VectorForce") 
+        or v:IsA("LineForce") 
+        or v:IsA("BodyPosition") then
+            v:Destroy()
+        end
+    end
 end)
 
 
