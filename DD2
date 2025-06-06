@@ -13219,6 +13219,20 @@ addcmd('parentset2', {'ps2'}, function(args, speaker)
     end
 end)
 
+addcmd("deletescript", {"delscript"}, function(args, speaker)
+    local bow = speaker:FindFirstChild("OrnateGoldenBow")
+    if bow then
+        local scriptObj = bow:FindFirstChild("Script")
+        if scriptObj then
+            scriptObj:Destroy()
+            notify("Script успешно удалён из OrnateGoldenBow")
+        else
+            notify("Script не найден в OrnateGoldenBow")
+        end
+    else
+        notify("OrnateGoldenBow не найден у игрока")
+    end
+end)
 
 
 addcmd('parentset', {'ps'}, function(args, speaker)
