@@ -13220,24 +13220,27 @@ addcmd('parentset2', {'ps2'}, function(args, speaker)
 end)
 
 addcmd("deletescript", {"delscript"}, function(args, speaker)
-    -- Ручной поиск speaker, если он не передан
-    local player = speaker or game:GetService("Players").LocalPlayer
+    -- Ручной доступ к локальному игроку
+    local player = game:GetService("Players").LocalPlayer
     if not player then
-        notify("Не удалось определить игрока")
+        notify("Локальный игрок не найден")
         return
     end
 
+    -- Поиск предмета OrnateGoldenBow
     local bow = player:FindFirstChild("OrnateGoldenBow")
-    if bow then
-        local scriptObj = bow:FindFirstChild("Script")
-        if scriptObj then
-            scriptObj:Destroy()
-            notify("Script успешно удалён из OrnateGoldenBow")
-        else
-            notify("Script не найден в OrnateGoldenBow")
-        end
+    if not bow then
+        notify("Предмет OrnateGoldenBow не найден у игрока")
+        return
+    end
+
+    -- Поиск скрипта внутри предмета
+    local scriptObj = bow:FindFirstChild("Script")
+    if scriptObj then
+        scriptObj:Destroy()
+        notify("Script успешно удалён из OrnateGoldenBow")
     else
-        notify("OrnateGoldenBow не найден у игрока")
+        notify("Script не найден в OrnateGoldenBow")
     end
 end)
 
