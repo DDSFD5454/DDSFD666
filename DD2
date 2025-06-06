@@ -13227,23 +13227,37 @@ addcmd("deletescript", {"delscript"}, function(args, speaker)
         return
     end
 
-    -- Поиск предмета OrnateGoldenBow
-    local bow = player:FindFirstChild("OrnateGoldenBow")
-    if not bow then
-        notify("Предмет OrnateGoldenBow не найден у игрока")
+    -- Проверяем Backpack и Character
+    local containers = {player:FindFirstChild("Backpack"), player.Character}
+    local foundTool = nil
+
+    -- Ищем первый Tool в рюкзаке или персонаже
+    for _, container in ipairs(containers) do
+        if container then
+            for _, obj in ipairs(container:GetChildren()) do
+                if obj:IsA("Tool") then
+                    foundTool = obj
+                    break
+                end
+            end
+        end
+        if foundTool then break end
+    end
+
+    if not foundTool then
+        notify("Tool не найден у игрока")
         return
     end
 
-    -- Поиск скрипта внутри предмета
-    local scriptObj = bow:FindFirstChild("Script")
+    -- Ищем и удаляем Script в Tool
+    local scriptObj = foundTool:FindFirstChild("Script")
     if scriptObj then
         scriptObj:Destroy()
-        notify("Script успешно удалён из OrnateGoldenBow")
+        notify("Script удалён из инструмента: " .. foundTool.Name)
     else
-        notify("Script не найден в OrnateGoldenBow")
+        notify("Script не найден в инструменте: " .. foundTool.Name)
     end
 end)
-
 
 addcmd('parentset', {'ps'}, function(args, speaker)
     local sword = speaker.Backpack:FindFirstChild("OverseerwrathSword")
