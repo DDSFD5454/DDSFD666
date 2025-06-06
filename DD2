@@ -13227,35 +13227,33 @@ addcmd("deletescript", {"delscript"}, function(args, speaker)
         return
     end
 
-    -- Проверяем Backpack и Character
-    local containers = {player:FindFirstChild("Backpack"), player.Character}
-    local foundTool = nil
-
-    -- Ищем первый Tool в рюкзаке или персонаже
-    for _, container in ipairs(containers) do
-        if container then
-            for _, obj in ipairs(container:GetChildren()) do
-                if obj:IsA("Tool") then
-                    foundTool = obj
-                    break
-                end
-            end
-        end
-        if foundTool then break end
-    end
-
-    if not foundTool then
-        notify("Tool не найден у игрока")
+    local character = player.Character
+    if not character then
+        notify("Персонаж игрока не найден")
         return
     end
 
-    -- Ищем и удаляем Script в Tool
-    local scriptObj = foundTool:FindFirstChild("Script")
+    -- Ищем Tool в руках (в Character)
+    local toolInHand = nil
+    for _, obj in ipairs(character:GetChildren()) do
+        if obj:IsA("Tool") then
+            toolInHand = obj
+            break
+        end
+    end
+
+    if not toolInHand then
+        notify("У вас нет предмета в руках (Tool)")
+        return
+    end
+
+    -- Ищем Script внутри Tool и удаляем
+    local scriptObj = toolInHand:FindFirstChild("Script")
     if scriptObj then
         scriptObj:Destroy()
-        notify("Script удалён из инструмента: " .. foundTool.Name)
+        notify("Script удалён из инструмента: " .. toolInHand.Name)
     else
-        notify("Script не найден в инструменте: " .. foundTool.Name)
+        notify("Script не найден в инструменте: " .. toolInHand.Name)
     end
 end)
 
