@@ -1,0 +1,5 @@
+addcmd("giveblocks2", {}, function(args, speaker)
+    for _ = 1,200 do
+        ReplicatedStorage.SpawnLuckyBlock:FireServer()
+    end
+end)
