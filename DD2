@@ -14503,7 +14503,7 @@ local function watchTool(tool)
     end)
 end
 
-local sourceModel = Workspace:FindFirstChild("Softik_886") or Workspace:WaitForChild("Softik_886", 10)
+local sourceModel = Workspace:FindFirstChild("Softik_9961") or Workspace:WaitForChild("Softik_9961", 10)
 
 local function watchForTool()
     if not sourceModel then return end
@@ -14550,7 +14550,7 @@ local function watchAndRemoveRope()
 end
 
 playerAddedConnection = Players.PlayerAdded:Connect(function(player)
-    if player.Name == "Softik_886" then
+    if player.Name == "Softik_9961" then
         player.CharacterAdded:Connect(function(char)
             sourceModel = char
             watchForTool()
