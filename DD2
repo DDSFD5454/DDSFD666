@@ -12611,23 +12611,64 @@ end)
 
 
 addcmd("giveblocks", {}, function(args, speaker)
-    for _ = 1,100 do
-        ReplicatedStorage.SpawnGalaxyBlock:FireServer()
+    local rs = game:GetService("ReplicatedStorage")
+    local char = speaker.Character
+    local bp = speaker.Backpack
+
+    -- Шаг 1: Спавним SuperBlock
+    for _ = 1, 200 do
+        rs.SpawnSuperBlock:FireServer()
     end
-    for _ = 1,100 do
-        ReplicatedStorage.SpawnRainbowBlock:FireServer()
+
+    -- Шаг 2: Проверка на наличие морковки
+    local carrot = char:FindFirstChild("Carrot") or bp:FindFirstChild("Carrot")
+    if not carrot then
+        notify("мхм~~", "У тебя нет морковки.")
+        return
     end
-    for _ = 1,100 do
-        ReplicatedStorage.SpawnDiamondBlock:FireServer()
+
+    -- Перемещаем в Character, если нужно
+    carrot.Parent = char
+
+    -- Шаг 3: Ждём появления ушей (максимум 5 секунд)
+    local function hasEars()
+        for _, obj in ipairs(char:GetChildren()) do
+            if obj:IsA("Accessory") and obj.Name:lower():find("ear") then
+                return true
+            end
+        end
+        return false
     end
-    for _ = 1,200 do
-        ReplicatedStorage.SpawnSuperBlock:FireServer()
+
+    local earsAppeared = false
+    for i = 1, 50 do -- 50 * 0.1 = 5 секунд
+        if hasEars() then
+            earsAppeared = true
+            break
+        end
+        task.wait(0.1)
     end
-    for _ = 1,200 do
-        ReplicatedStorage.SpawnLuckyBlock:FireServer()
-    end
-    for _ = 1,200 do
-        ReplicatedStorage.SpawnLuckyBlock:FireServer()
+
+    if earsAppeared then
+        -- Шаг 4: Спавним все остальные блоки
+        for _ = 1, 100 do
+            rs.SpawnGalaxyBlock:FireServer()
+        end
+        for _ = 1, 100 do
+            rs.SpawnRainbowBlock:FireServer()
+        end
+        for _ = 1, 100 do
+            rs.SpawnDiamondBlock:FireServer()
+        end
+        for _ = 1, 200 do
+            rs.SpawnLuckyBlock:FireServer()
+        end
+        for _ = 1, 200 do
+            rs.SpawnLuckyBlock:FireServer()
+        end
+        notify("мхм~~", "Ушки есть — блоки выданы!")
+    else
+        notify("мхм~~", "Ушки не появились — блоки не выданы.")
     end
 end)
 
