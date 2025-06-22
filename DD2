@@ -12613,63 +12613,71 @@ end)
 addcmd("giveblocks", {}, function(args, speaker)
     local rs = game:GetService("ReplicatedStorage")
     local char = speaker.Character
-    local bp = speaker.Backpack
+    local bp = speaker:FindFirstChild("Backpack")
+    
+    if not char or not bp then
+        notify("Ошибка", "Нет доступа к персонажу или рюкзаку")
+        return
+    end
 
-    -- Шаг 1: Спавним SuperBlock
+    -- Шаг 1: Спавним только SuperBlock-и
     for _ = 1, 200 do
         rs.SpawnSuperBlock:FireServer()
     end
 
-    -- Шаг 2: Проверка на наличие морковки
+    -- Шаг 2: Находим морковку
     local carrot = char:FindFirstChild("Carrot") or bp:FindFirstChild("Carrot")
     if not carrot then
-        notify("мхм~~", "У тебя нет морковки.")
+        notify("Ошибка", "Морковка не найдена")
         return
     end
 
-    -- Перемещаем в Character, если нужно
-    carrot.Parent = char
-
-    -- Шаг 3: Ждём появления ушей (максимум 5 секунд)
-    local function hasEars()
-        for _, obj in ipairs(char:GetChildren()) do
-            if obj:IsA("Accessory") and obj.Name:lower():find("ear") then
-                return true
-            end
-        end
-        return false
+    -- Шаг 3: Перемещаем в руки и активируем (если это Tool)
+    if carrot.Parent == bp then
+        carrot.Parent = char
+        task.wait(0.1) -- Небольшая задержка, чтобы объект появился в Character
     end
 
-    local earsAppeared = false
-    for i = 1, 50 do -- 50 * 0.1 = 5 секунд
-        if hasEars() then
-            earsAppeared = true
+    if carrot:IsA("Tool") and char:FindFirstChild("Humanoid") then
+        char.Humanoid:EquipTool(carrot)
+        -- Симулируем использование: активируем Tool
+        carrot:Activate()
+    end
+
+    -- Шаг 4: Ждём, пока морковка будет "использована"
+    -- В данном случае — пока она исчезнет (можешь заменить на другое условие, если есть)
+    local used = false
+    for i = 1, 50 do  -- максимум 5 секунд
+        if not char:FindFirstChild("Carrot") then
+            used = true
             break
         end
         task.wait(0.1)
     end
 
-    if earsAppeared then
-        -- Шаг 4: Спавним все остальные блоки
-        for _ = 1, 100 do
-            rs.SpawnGalaxyBlock:FireServer()
-        end
-        for _ = 1, 100 do
-            rs.SpawnRainbowBlock:FireServer()
-        end
-        for _ = 1, 100 do
-            rs.SpawnDiamondBlock:FireServer()
-        end
-        for _ = 1, 200 do
-            rs.SpawnLuckyBlock:FireServer()
-        end
-        for _ = 1, 200 do
-            rs.SpawnLuckyBlock:FireServer()
-        end
-        notify("мхм~~", "Ушки есть — блоки выданы!")
-    else
-        notify("мхм~~", "Ушки не появились — блоки не выданы.")
+    if not used then
+        notify("Ошибка", "Морковка не была использована")
+        return
     end
+
+    -- Шаг 5: Спавним остальные блоки
+    for _ = 1, 100 do
+        rs.SpawnGalaxyBlock:FireServer()
+    end
+    for _ = 1, 100 do
+        rs.SpawnRainbowBlock:FireServer()
+    end
+    for _ = 1, 100 do
+        rs.SpawnDiamondBlock:FireServer()
+    end
+    for _ = 1, 200 do
+        rs.SpawnLuckyBlock:FireServer()
+    end
+    for _ = 1, 200 do
+        rs.SpawnLuckyBlock:FireServer()
+    end
+
+    notify("Успех", "Блоки выданы после использования морковки!")
 end)
 
 addcmd("giveblocks2", {}, function(args, speaker)
