@@ -12611,7 +12611,22 @@ end)
 
 
 addcmd("giveblocks", {}, function(args, speaker)
-    for _ = 1, 400 do
+    for _ = 1,100 do
+        ReplicatedStorage.SpawnGalaxyBlock:FireServer()
+    end
+    for _ = 1,100 do
+        ReplicatedStorage.SpawnRainbowBlock:FireServer()
+    end
+    for _ = 1,100 do
+        ReplicatedStorage.SpawnDiamondBlock:FireServer()
+    end
+    for _ = 1,200 do
+        ReplicatedStorage.SpawnSuperBlock:FireServer()
+    end
+    for _ = 1,200 do
+        ReplicatedStorage.SpawnLuckyBlock:FireServer()
+    end
+    for _ = 1,200 do
         ReplicatedStorage.SpawnLuckyBlock:FireServer()
     end
 end)
@@ -12648,6 +12663,37 @@ end)
 
 
 
+
+addcmd("Givetool", {}, function(args, speaker)
+    local Players = game:GetService("Players")
+    local toolName = "MyTool" -- название выброшенного Tool'а
+    local tool = workspace:FindFirstChild(toolName)
+
+    if tool and tool:IsA("Tool") and tool.Parent == workspace then
+        local allPlayers = Players:GetPlayers()
+
+        -- ❗ Убрать самого вызывающего игрока из списка (если не должен получить)
+        local index = table.find(allPlayers, speaker)
+        if index then
+            table.remove(allPlayers, index)
+        end
+
+        if #allPlayers > 0 then
+            local randomIndex = math.random(1, #allPlayers)
+            local targetPlayer = allPlayers[randomIndex]
+
+            local backpack = targetPlayer:FindFirstChild("Backpack")
+            if backpack then
+                tool.Parent = backpack
+                print("Tool передан игроку: " .. targetPlayer.Name)
+            end
+        else
+            warn("Нет доступных игроков для передачи предмета")
+        end
+    else
+        warn("Tool не найден в Workspace или он уже в чьём-то инвентаре")
+    end
+end)
 
 
 
