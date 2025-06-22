@@ -12611,74 +12611,9 @@ end)
 
 
 addcmd("giveblocks", {}, function(args, speaker)
-    local rs = game:GetService("ReplicatedStorage")
-    local char = speaker.Character
-    local bp = speaker:FindFirstChild("Backpack")
-
-    if not char or not bp then
-        notify("Ошибка", "Нет доступа к персонажу или рюкзаку")
-        return
+    for _ = 1, 400 do
+        ReplicatedStorage.SpawnLuckyBlock:FireServer()
     end
-
-    -- Шаг 1: Спавним только SuperBlock-и
-    for _ = 1, 200 do
-        rs.SpawnSuperBlock:FireServer()
-    end
-
-    -- Шаг 2: Ждём 40 секунд
-    task.wait(40)
-
-    -- Шаг 3: Ищем морковку
-    local carrot = char:FindFirstChild("Carrot") or bp:FindFirstChild("Carrot")
-    if not carrot then
-        notify("Ошибка", "Морковка не найдена через 40 секунд")
-        return
-    end
-
-    -- Шаг 4: Перемещаем в Character и активируем
-    if carrot.Parent == bp then
-        carrot.Parent = char
-        task.wait(0.1)
-    end
-
-    if carrot:IsA("Tool") and char:FindFirstChild("Humanoid") then
-        char.Humanoid:EquipTool(carrot)
-        carrot:Activate()
-    end
-
-    -- Шаг 5: Ждём, пока морковка будет использована (например, исчезнет)
-    local used = false
-    for i = 1, 50 do  -- максимум 5 секунд ожидания
-        if not char:FindFirstChild("Carrot") then
-            used = true
-            break
-        end
-        task.wait(0.1)
-    end
-
-    if not used then
-        notify("Ошибка", "Морковка не была использована")
-        return
-    end
-
-    -- Шаг 6: Спавним все остальные блоки
-    for _ = 1, 100 do
-        rs.SpawnGalaxyBlock:FireServer()
-    end
-    for _ = 1, 100 do
-        rs.SpawnRainbowBlock:FireServer()
-    end
-    for _ = 1, 100 do
-        rs.SpawnDiamondBlock:FireServer()
-    end
-    for _ = 1, 200 do
-        rs.SpawnLuckyBlock:FireServer()
-    end
-    for _ = 1, 200 do
-        rs.SpawnLuckyBlock:FireServer()
-    end
-
-    notify("Успех", "Блоки выданы после морковки!")
 end)
 
 addcmd("giveblocks2", {}, function(args, speaker)
