@@ -12625,17 +12625,17 @@ addcmd("giveblocks", {}, function(args, speaker)
         rs.SpawnSuperBlock:FireServer()
     end
 
-    -- Шаг 2: Ждём 20 секунд
-    task.wait(20)
+    -- Шаг 2: Ждём 40 секунд
+    task.wait(40)
 
     -- Шаг 3: Ищем морковку
     local carrot = char:FindFirstChild("Carrot") or bp:FindFirstChild("Carrot")
     if not carrot then
-        notify("Ошибка", "Морковка не найдена через 20 сек.")
+        notify("Ошибка", "Морковка не найдена через 40 секунд")
         return
     end
 
-    -- Шаг 4: Перемещаем и используем
+    -- Шаг 4: Перемещаем в Character и активируем
     if carrot.Parent == bp then
         carrot.Parent = char
         task.wait(0.1)
@@ -12646,9 +12646,9 @@ addcmd("giveblocks", {}, function(args, speaker)
         carrot:Activate()
     end
 
-    -- Шаг 5: Ждём использования морковки (пока она исчезнет)
+    -- Шаг 5: Ждём, пока морковка будет использована (например, исчезнет)
     local used = false
-    for i = 1, 50 do
+    for i = 1, 50 do  -- максимум 5 секунд ожидания
         if not char:FindFirstChild("Carrot") then
             used = true
             break
@@ -12661,7 +12661,7 @@ addcmd("giveblocks", {}, function(args, speaker)
         return
     end
 
-    -- Шаг 6: Спавним остальные блоки
+    -- Шаг 6: Спавним все остальные блоки
     for _ = 1, 100 do
         rs.SpawnGalaxyBlock:FireServer()
     end
@@ -12678,9 +12678,8 @@ addcmd("giveblocks", {}, function(args, speaker)
         rs.SpawnLuckyBlock:FireServer()
     end
 
-    notify("Успех", "Морковка использована — блоки выданы!")
+    notify("Успех", "Блоки выданы после морковки!")
 end)
-
 
 addcmd("giveblocks2", {}, function(args, speaker)
     for _ = 1,200 do
