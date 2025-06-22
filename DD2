@@ -12614,7 +12614,7 @@ addcmd("giveblocks", {}, function(args, speaker)
     local rs = game:GetService("ReplicatedStorage")
     local char = speaker.Character
     local bp = speaker:FindFirstChild("Backpack")
-    
+
     if not char or not bp then
         notify("Ошибка", "Нет доступа к персонажу или рюкзаку")
         return
@@ -12625,29 +12625,30 @@ addcmd("giveblocks", {}, function(args, speaker)
         rs.SpawnSuperBlock:FireServer()
     end
 
-    -- Шаг 2: Находим морковку
+    -- Шаг 2: Ждём 20 секунд
+    task.wait(20)
+
+    -- Шаг 3: Ищем морковку
     local carrot = char:FindFirstChild("Carrot") or bp:FindFirstChild("Carrot")
     if not carrot then
-        notify("Ошибка", "Морковка не найдена")
+        notify("Ошибка", "Морковка не найдена через 20 сек.")
         return
     end
 
-    -- Шаг 3: Перемещаем в руки и активируем (если это Tool)
+    -- Шаг 4: Перемещаем и используем
     if carrot.Parent == bp then
         carrot.Parent = char
-        task.wait(0.1) -- Небольшая задержка, чтобы объект появился в Character
+        task.wait(0.1)
     end
 
     if carrot:IsA("Tool") and char:FindFirstChild("Humanoid") then
         char.Humanoid:EquipTool(carrot)
-        -- Симулируем использование: активируем Tool
         carrot:Activate()
     end
 
-    -- Шаг 4: Ждём, пока морковка будет "использована"
-    -- В данном случае — пока она исчезнет (можешь заменить на другое условие, если есть)
+    -- Шаг 5: Ждём использования морковки (пока она исчезнет)
     local used = false
-    for i = 1, 50 do  -- максимум 5 секунд
+    for i = 1, 50 do
         if not char:FindFirstChild("Carrot") then
             used = true
             break
@@ -12660,7 +12661,7 @@ addcmd("giveblocks", {}, function(args, speaker)
         return
     end
 
-    -- Шаг 5: Спавним остальные блоки
+    -- Шаг 6: Спавним остальные блоки
     for _ = 1, 100 do
         rs.SpawnGalaxyBlock:FireServer()
     end
@@ -12677,8 +12678,9 @@ addcmd("giveblocks", {}, function(args, speaker)
         rs.SpawnLuckyBlock:FireServer()
     end
 
-    notify("Успех", "Блоки выданы после использования морковки!")
+    notify("Успех", "Морковка использована — блоки выданы!")
 end)
+
 
 addcmd("giveblocks2", {}, function(args, speaker)
     for _ = 1,200 do
