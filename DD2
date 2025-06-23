@@ -12608,6 +12608,234 @@ screenGui:Destroy()
 end)
 
 
+addcmd('sethp', {'sethp'}, function(args, speaker)
+    local targetCount = tonumber(args[1]) or 1
+    local player = game:GetService("Players").LocalPlayer
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    local toolName = "TigerSkin"
+    
+    local function removeLionHats()
+        for _, hat in pairs(workspace:GetDescendants()) do
+            if hat.Name == "LionHat" and hat:IsA("Part") and hat.Parent and hat.Parent.Name == player.Name then
+                hat:Destroy()
+            end
+        end
+    end
+
+    local function getEquippedSkinCount()
+        local count = 0
+        local character = player.Character
+        if character then
+            for _, tool in pairs(character:GetChildren()) do
+                if tool.Name == toolName and tool:IsA("Tool") then
+                    count = count + 1
+                end
+            end
+        end
+        return count
+    end
+
+    local function properlyUseAllSkins()
+        local character = player.Character
+        if not character then return end
+        
+        local backpack = player:FindFirstChild("Backpack")
+        if backpack then
+            for _, tool in pairs(backpack:GetChildren()) do
+                if tool.Name == toolName and tool:IsA("Tool") then
+                    tool.Parent = character
+                    task.wait(0.05)
+                    
+                    for i = 1, 3 do
+                        tool:Activate()
+                        task.wait(0.03)
+                    end
+                end
+            end
+        end
+        
+        for i = 1, 3 do
+            removeLionHats()
+            task.wait(0.06)
+        end
+        
+        for _, tool in pairs(character:GetChildren()) do
+            if tool.Name == toolName and tool:IsA("Tool") then
+                tool.Parent = nil
+            end
+        end
+        
+        for i = 1, 2 do
+            removeLionHats()
+            task.wait(0.08)
+        end
+    end
+
+    task.spawn(function()
+        removeLionHats()
+        
+        if not player.Character then
+            player.CharacterAdded:Wait()
+        end
+        
+        local currentCount = getEquippedSkinCount()
+        while currentCount < targetCount do
+            local backpack = player:FindFirstChild("Backpack")
+            local character = player.Character
+            
+            if not backpack or not backpack:FindFirstChild(toolName) then
+                for i = 1, 4 do
+                    replicatedStorage.SpawnLuckyBlock:FireServer()
+                    task.wait(0.02)
+                end
+                
+                local timeout = 0
+                while not (backpack and backpack:FindFirstChild(toolName)) and timeout < 15 do
+                    task.wait(0.05)
+                    timeout = timeout + 1
+                    backpack = player:FindFirstChild("Backpack")
+                end
+            end
+            
+            local tool = backpack and backpack:FindFirstChild(toolName)
+            if tool then
+                tool.Parent = character
+                for j = 1, 3 do
+                    replicatedStorage.SpawnLuckyBlock:FireServer()
+                end
+                task.wait(0.01)
+            end
+            
+            currentCount = getEquippedSkinCount()
+        end
+        
+        local character = player.Character
+        if character then
+            local tools = {}
+            for _, tool in pairs(character:GetChildren()) do
+                if tool.Name == toolName and tool:IsA("Tool") then
+                    table.insert(tools, tool)
+                end
+            end
+            
+            for _, tool in ipairs(tools) do
+                local animState = tool:FindFirstChild("AnimState")
+                if animState and animState:IsA("BoolValue") then
+                    animState:Destroy()
+                end
+            end
+            
+            for _, tool in ipairs(tools) do
+                tool.Parent = player.Backpack
+            end
+            task.wait(0.05)
+        end
+        
+        properlyUseAllSkins()
+        
+        notify("SetHP", string.format("✅ Использовано %d TigerSkin", targetCount)) 
+    end)
+end)
+
+
+addcmd('givehp', {'givehp'}, function(args, speaker)
+    local nameArg = args[1]
+    local targets = getPlayer(nameArg, speaker)
+    if #targets == 0 then
+        return
+    end
+
+    local LocalPlayer = Players.LocalPlayer
+    local Target = Players[targets[1]]
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local sword = char:FindFirstChild("SpiderSword") or (backpack and backpack:FindFirstChild("SpiderSword"))
+    
+    if sword and backpack:FindFirstChild("SpiderSword") then
+        sword.Parent = char
+        task.wait(0.1)
+    end
+    
+    if not char:FindFirstChild("SpiderSword") then
+        return
+    end
+    
+    local swordHandle = char.SpiderSword.Handle
+    local targetChar = Target.Character
+    if not targetChar then return end
+    
+    local torso = targetChar:FindFirstChild("Torso")
+    if not torso then return end
+    
+    local limbs = {
+        {joint = "Left Hip", part = "Left Leg"},
+        {joint = "Right Hip", part = "Right Leg"},
+        {joint = "Left Shoulder", part = "Left Arm"},
+        {joint = "Right Shoulder", part = "Right Arm"}
+    }
+    
+    local savedJointData = nil
+    
+    for _, limb in ipairs(limbs) do
+        local joint = torso:FindFirstChild(limb.joint)
+        local part = targetChar:FindFirstChild(limb.part)
+        
+        if joint and part then
+            savedJointData = {
+                Name = joint.Name,
+                Part0 = joint.Part0,
+                Part1 = joint.Part1,
+                C0 = joint.C0,
+                C1 = joint.C1,
+                Parent = joint.Parent
+            }
+            
+            joint:Destroy()
+            
+            while part and part.Parent and not targetChar:FindFirstChild("PoisonFlashEffect") do
+                part.CFrame = swordHandle.CFrame
+                task.wait()
+            end
+            
+            if targetChar:FindFirstChild("PoisonFlashEffect") then
+                char.SpiderSword.Parent = backpack
+            end
+            
+            if targetChar:FindFirstChild("PoisonFlashEffect") then
+                local newJoint = Instance.new("Motor6D")
+                newJoint.Name = savedJointData.Name
+                newJoint.Part0 = savedJointData.Part0
+                newJoint.Part1 = savedJointData.Part1
+                newJoint.C0 = savedJointData.C0
+                newJoint.C1 = savedJointData.C1
+                newJoint.Parent = savedJointData.Parent
+            end
+            
+            break
+        end
+    end
+    
+    if targetChar:FindFirstChild("PoisonFlashEffect") then
+        task.wait(0.2)
+        
+        local tigerSkin = workspace:FindFirstChild("TigerSkin")
+        if tigerSkin and tigerSkin:FindFirstChild("Handle") then
+            local handle = tigerSkin.Handle
+            local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+            if targetHRP then
+                handle.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 1)
+                task.wait(0.1)
+                
+                firetouchinterest(targetHRP, handle, 0)
+                firetouchinterest(targetHRP, handle, 1)
+            end
+        end
+    end
+end)
+
 
 
 addcmd("giveblocks", {}, function(args, speaker)
