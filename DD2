@@ -12821,9 +12821,31 @@ addcmd('givehp', {'givehp'}, function(args, speaker)
     if targetChar:FindFirstChild("PoisonFlashEffect") then
         task.wait(0.2)
         
-        local tigerSkin = workspace:FindFirstChild("TigerSkin")
-        if tigerSkin and tigerSkin:FindFirstChild("Handle") then
-            local handle = tigerSkin.Handle
+        -- Check if unlimited radius folder exists
+        local unlimitedRadius = workspace:FindFirstChild("folder") ~= nil
+        
+        -- Find nearest TigerSkin
+        local nearestTigerSkin = nil
+        local nearestDistance = unlimitedRadius and math.huge or 350
+        local localPlayerPos = char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.Position
+        
+        if localPlayerPos then
+            for _, item in ipairs(workspace:GetChildren()) do
+                if item.Name == "TigerSkin" and item:FindFirstChild("Handle") then
+                    local handle = item.Handle
+                    local distance = (handle.Position - localPlayerPos).Magnitude
+                    
+                    if unlimitedRadius or distance <= nearestDistance then
+                        nearestDistance = distance
+                        nearestTigerSkin = item
+                    end
+                end
+            end
+        end
+        
+        -- Only proceed if we found a TigerSkin
+        if nearestTigerSkin then
+            local handle = nearestTigerSkin.Handle
             local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
             if targetHRP then
                 handle.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 1)
@@ -12835,6 +12857,7 @@ addcmd('givehp', {'givehp'}, function(args, speaker)
         end
     end
 end)
+
 
 addcmd('spawnkill', {'spawnkill'}, function(args, speaker)
     local targetName = args[1]
