@@ -12839,66 +12839,80 @@ end)
 addcmd('spawnkill', {'spawnkill'}, function(args, speaker)
     local targetName = args[1]
     if not targetName then return end
-
+    
     local target = getPlayer(targetName, speaker)
     if #target == 0 then return end
     target = target[1]
-
+    
     local LocalPlayer = game:GetService("Players").LocalPlayer
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     local backpack = LocalPlayer:FindFirstChild("Backpack")
-
+    
+    if humanoid then
+        humanoid:UnequipTools()
+    end
+    
     if character:FindFirstChild("Health") then
         character.Health:Destroy()
     end
-
+    
     local function checkHP()
         while humanoid and humanoid.Health >= 1 do
             humanoid:UnequipTools()
             execCmd('dropclone')
-            task.wait(0.1)
+            task.wait(0.5)
         end
     end
-
+    
     local function activateTigerSkin()
         local tool = backpack:FindFirstChild("TigerSkin")
         if tool then
             tool.Parent = character
             task.wait(0.1)
             tool:Activate()
-
-            while not character:FindFirstChild("LionHat") do
-                execCmd('dropclone')
+            
+            local maxAttempts = 50
+            local attempts = 0
+            while not character:FindFirstChild("LionHat") and attempts < maxAttempts do
                 task.wait(0.1)
+                attempts = attempts + 1
             end
-
-            execCmd('dropclone')
-
-            while not workspace:FindFirstChild("TigerSkin") do
-                execCmd('dropclone')
+            
+            if character:FindFirstChild("LionHat") then
+                local dropAttempts = 0
+                while dropAttempts < 10 do
+                    execCmd('dropclone')
+                    task.wait(0.2)
+                    dropAttempts = dropAttempts + 1
+                end
+            end
+            
+            attempts = 0
+            while not workspace:FindFirstChild("TigerSkin") and attempts < 50 do
                 task.wait(0.1)
+                attempts = attempts + 1
             end
         end
     end
-
+    
     local function teleportLimbs()
         local targetChar = game:GetService("Players")[target].Character
         if not targetChar then return end
-
+        
         local torso = targetChar:FindFirstChild("Torso")
         if not torso then return end
-
+        
         local sword = character:FindFirstChild("OverseerwrathSword")
         if not sword then return end
-
+        
         local limbs = {
             {joint = "Left Hip", part = "Left Leg"},
             {joint = "Right Hip", part = "Right Leg"},
             {joint = "Left Shoulder", part = "Left Arm"},
             {joint = "Right Shoulder", part = "Right Arm"}
         }
-
+        
         local limbToTeleport
         for _, limb in ipairs(limbs) do
             if torso:FindFirstChild(limb.joint) and targetChar:FindFirstChild(limb.part) then
@@ -12906,19 +12920,19 @@ addcmd('spawnkill', {'spawnkill'}, function(args, speaker)
                 break
             end
         end
-
+        
         if not limbToTeleport then return end
-
+        
         torso[limbToTeleport.joint]:Destroy()
         local limbPart = targetChar[limbToTeleport.part]
-
+        
         local connection
         connection = game:GetService("RunService").Heartbeat:Connect(function()
             if not sword or not sword:IsDescendantOf(character) or not limbPart or not limbPart:IsDescendantOf(targetChar) then
                 connection:Disconnect()
                 return
             end
-
+            
             limbPart.CFrame = sword.Handle.CFrame * CFrame.new(
                 math.random(-0.2, 0.2),
                 math.random(-0.2, 0.2),
@@ -12926,17 +12940,34 @@ addcmd('spawnkill', {'spawnkill'}, function(args, speaker)
             )
         end)
     end
-
+    
     checkHP()
     activateTigerSkin()
     task.wait(4)
     execCmd('givehp '..target)
-
-    local sword = backpack:FindFirstChild("OverseerwrathSword")
-    if sword then
-        sword.Parent = character
-        task.wait(0.1)
-        teleportLimbs()
+    
+    local targetChar = game:GetService("Players")[target].Character
+    if targetChar then
+        local poisonFlashFound = false
+        local maxWaitTime = 5
+        local startTime = os.time()
+        
+        while not poisonFlashFound and (os.time() - startTime) < maxWaitTime do
+            if targetChar:FindFirstChild("PoisonFlashEffect") then
+                poisonFlashFound = true
+                break
+            end
+            task.wait(0.1)
+        end
+        
+        if poisonFlashFound then
+            local sword = backpack:FindFirstChild("OverseerwrathSword")
+            if sword then
+                sword.Parent = character
+                task.wait(0.1)
+                teleportLimbs()
+            end
+        end
     end
 end)
 
