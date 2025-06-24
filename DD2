@@ -12860,140 +12860,324 @@ end)
 
 
 addcmd('spawnkill', {'spawnkill'}, function(args, speaker)
-    local targetName = args[1]
-    if not targetName then return end
-    
-    local target = getPlayer(targetName, speaker)
-    if #target == 0 then return end
-    target = target[1]
-    
-    local LocalPlayer = game:GetService("Players").LocalPlayer
-    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local nameArg = args[1]
+    if not nameArg then
+        return
+    end
+
+    local targets = getPlayer(nameArg, speaker)
+    if #targets == 0 then
+        return
+    end
+    local targetName = targets[1]
+    local targetPlayer = Players[targetName]
+    if not targetPlayer or not targetPlayer.Character then
+        return
+    end
+
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
     local humanoid = character:FindFirstChildOfClass("Humanoid")
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    
-    if humanoid then
-        humanoid:UnequipTools()
+    local backpack = player:WaitForChild("Backpack")
+
+    local targetChar = targetPlayer.Character
+    local targetHumanoid = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+    if not targetHumanoid then
+        return
     end
-    
-    if character:FindFirstChild("Health") then
-        character.Health:Destroy()
-    end
-    
-    local function checkHP()
-        while humanoid and humanoid.Health >= 1 do
-            humanoid:UnequipTools()
-            execCmd('dropclone')
-            task.wait(0.5)
-        end
-    end
-    
-    local function activateTigerSkin()
-        local tool = backpack:FindFirstChild("TigerSkin")
-        if tool then
-            tool.Parent = character
+
+    if targetHumanoid.Health < 43 then
+        local swordTool = backpack:FindFirstChild("OverseerwrathSword")
+        if swordTool then
+            swordTool.Parent = character
             task.wait(0.1)
-            tool:Activate()
-            
-            local maxAttempts = 50
-            local attempts = 0
-            while not character:FindFirstChild("LionHat") and attempts < maxAttempts do
-                task.wait(0.1)
-                attempts = attempts + 1
-            end
-            
-            if character:FindFirstChild("LionHat") then
-                local dropAttempts = 0
-                while dropAttempts < 10 do
-                    execCmd('dropclone')
-                    task.wait(0.2)
-                    dropAttempts = dropAttempts + 1
+        else
+            return
+        end
+
+        local targetTorso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+        if not targetTorso then return end
+
+        local function findLimb()
+            local limbs = {
+                {motor = "Left Hip", partName = "Left Leg"},
+                {motor = "Right Hip", partName = "Right Leg"},
+                {motor = "Left Shoulder", partName = "Left Arm"},
+                {motor = "Right Shoulder", partName = "Right Arm"},
+            }
+            for _, v in ipairs(limbs) do
+                local motor = targetTorso:FindFirstChild(v.motor)
+                local limb = targetChar:FindFirstChild(v.partName)
+                if motor and limb then
+                    return motor, limb
+                elseif limb then
+                    return nil, limb
                 end
             end
-            
-            attempts = 0
-            while not workspace:FindFirstChild("TigerSkin") and attempts < 50 do
-                task.wait(0.1)
-                attempts = attempts + 1
-            end
+            return nil, nil
         end
-    end
-    
-    local function teleportLimbs()
-        local targetChar = game:GetService("Players")[target].Character
-        if not targetChar then return end
-        
-        local torso = targetChar:FindFirstChild("Torso")
-        if not torso then return end
-        
-        local sword = character:FindFirstChild("OverseerwrathSword")
-        if not sword then return end
-        
-        local limbs = {
-            {joint = "Left Hip", part = "Left Leg"},
-            {joint = "Right Hip", part = "Right Leg"},
-            {joint = "Left Shoulder", part = "Left Arm"},
-            {joint = "Right Shoulder", part = "Right Arm"}
-        }
-        
-        local limbToTeleport
-        for _, limb in ipairs(limbs) do
-            if torso:FindFirstChild(limb.joint) and targetChar:FindFirstChild(limb.part) then
-                limbToTeleport = limb
-                break
+
+        local motor6d, limb = findLimb()
+        if motor6d then motor6d:Destroy() end
+
+        local swordHandle = swordTool:FindFirstChild("Handle")
+        if not swordHandle or not limb then return end
+
+        local running = true
+        spawn(function()
+            while running do
+                if not targetPlayer.Character or
+                   not targetPlayer.Character:FindFirstChildOfClass("Humanoid") or
+                   targetPlayer.Character:FindFirstChildOfClass("Humanoid").Health <= 0 then
+                    running = false
+                    break
+                end
+
+                if not character:FindFirstChild("OverseerwrathSword") then
+                    running = false
+                    break
+                end
+
+                if limb and swordHandle then
+                    local offset = Vector3.new(
+                        math.random() - 0.5,
+                        math.random() - 0.5,
+                        math.random() - 0.5
+                    )
+                    limb.CFrame = swordHandle.CFrame * CFrame.new(offset)
+                end
+
+                task.wait(0.05)
             end
-        end
-        
-        if not limbToTeleport then return end
-        
-        torso[limbToTeleport.joint]:Destroy()
-        local limbPart = targetChar[limbToTeleport.part]
-        
-        local connection
-        connection = game:GetService("RunService").Heartbeat:Connect(function()
-            if not sword or not sword:IsDescendantOf(character) or not limbPart or not limbPart:IsDescendantOf(targetChar) then
-                connection:Disconnect()
-                return
-            end
-            
-            limbPart.CFrame = sword.Handle.CFrame * CFrame.new(
-                math.random(-0.2, 0.2),
-                math.random(-0.2, 0.2),
-                math.random(-0.2, 0.2)
-            )
         end)
+        return
     end
-    
-    checkHP()
-    activateTigerSkin()
-    task.wait(4)
-    execCmd('givehp '..target)
-    
-    local targetChar = game:GetService("Players")[target].Character
-    if targetChar then
-        local poisonFlashFound = false
-        local maxWaitTime = 5
-        local startTime = os.time()
-        
-        while not poisonFlashFound and (os.time() - startTime) < maxWaitTime do
-            if targetChar:FindFirstChild("PoisonFlashEffect") then
-                poisonFlashFound = true
+
+    local function unequipAllTools()
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") then
+                tool.Parent = backpack
+            end
+        end
+    end
+
+    local function dropCloneCycle()
+        local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+        if not torso then return end
+
+        local removedRightGrips = {}
+
+        local function findAliveClone()
+            for _, obj in ipairs(workspace:GetChildren()) do
+                if typeof(obj.Name) == "string" and string.find(obj.Name, "'s Clone") then
+                    local rightArm = obj:FindFirstChild("Right Arm") or obj:FindFirstChild("RightHand")
+                    local energySword = obj:FindFirstChild("EnergySword")
+                    local swordHandle = energySword and energySword:FindFirstChild("Handle")
+                    local humanoid = obj:FindFirstChildOfClass("Humanoid")
+                    if rightArm and swordHandle and humanoid and humanoid.Health > 0 and obj.Parent == workspace then
+                        return obj, rightArm, swordHandle
+                    end
+                end
+            end
+            return nil, nil, nil
+        end
+
+        local clone, rightArm, swordHandle = findAliveClone()
+        if clone and rightArm and swordHandle and torso then
+            local originalCFrame = swordHandle.CFrame
+
+            for _, child in ipairs(rightArm:GetChildren()) do
+                if child.Name == "RightGrip" then
+                    table.insert(removedRightGrips, child)
+                    child.Parent = nil
+                end
+            end
+
+            swordHandle.CFrame = torso.CFrame
+
+            task.delay(0.05, function()
+                for _, grip in ipairs(removedRightGrips) do
+                    grip.Parent = rightArm
+                end
+                swordHandle.CFrame = originalCFrame
+            end)
+        end
+    end
+
+    unequipAllTools()
+
+    local function lionHatExists()
+        return workspace:FindFirstChild(player.Name)
+           and workspace[player.Name]:FindFirstChild("LionHat")
+    end
+
+    local function isTigerSkinOnHands()
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool.Name == "TigerSkin" and tool:IsA("Tool") then
+                return true
+            end
+        end
+        return false
+    end
+
+    local function activateTigerSkin()
+        local toolName = "TigerSkin"
+        local tool = backpack:FindFirstChild(toolName)
+
+        if lionHatExists() then
+            return true
+        end
+
+        if not tool then
+            return false
+        end
+
+        tool.Parent = character
+
+        local startTime = tick()
+        while tick() - startTime < 5 do
+            if lionHatExists() then
+                return true
+            end
+
+            tool:Activate()
+            task.wait(0.2)
+        end
+
+        if lionHatExists() then
+            return true
+        else
+            return false
+        end
+    end
+
+    while humanoid and humanoid.Health >= 1 do
+        unequipAllTools()
+        dropCloneCycle()
+        task.wait(0.1)
+    end
+
+    local activated = activateTigerSkin()
+    if not activated then
+        return
+    end
+
+    local function waitForLionHat(timeout)
+        timeout = timeout or 15
+        local start = tick()
+        while tick() - start < timeout do
+            if lionHatExists() then
+                return true
+            end
+            task.wait(0.2)
+        end
+        return false
+    end
+
+    local lionHatAppeared = waitForLionHat(15)
+    if not lionHatAppeared then
+        return
+    end
+
+    local dropcloneLoopActive = true
+    spawn(function()
+        while dropcloneLoopActive do
+            dropCloneCycle()
+            if not isTigerSkinOnHands() then
+                dropcloneLoopActive = false
                 break
             end
             task.wait(0.1)
         end
-        
-        if poisonFlashFound then
-            local sword = backpack:FindFirstChild("OverseerwrathSword")
-            if sword then
-                sword.Parent = character
-                task.wait(0.1)
-                teleportLimbs()
+    end)
+
+    while dropcloneLoopActive do task.wait(0.2) end
+
+    task.wait(4)
+
+    execCmd("givehp " .. targetName)
+
+    local function waitForPoisonEffect(timeout)
+        timeout = timeout or 10
+        local start = tick()
+        while tick() - start < timeout do
+            if workspace:FindFirstChild(targetName)
+                and workspace[targetName]:FindFirstChild("PoisonFlashEffect") then
+                return true
+            end
+            task.wait(0.2)
+        end
+        return false
+    end
+
+    local poisonEffectOk = waitForPoisonEffect(15)
+    if not poisonEffectOk then
+    end
+
+    local swordTool = backpack:FindFirstChild("OverseerwrathSword")
+    if swordTool then
+        swordTool.Parent = character
+        task.wait(0.1)
+    else
+        return
+    end
+
+    local targetTorso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+    if not targetTorso then return end
+
+    local function findLimb()
+        local limbs = {
+            {motor = "Left Hip", partName = "Left Leg"},
+            {motor = "Right Hip", partName = "Right Leg"},
+            {motor = "Left Shoulder", partName = "Left Arm"},
+            {motor = "Right Shoulder", partName = "Right Arm"},
+        }
+        for _, v in ipairs(limbs) do
+            local motor = targetTorso:FindFirstChild(v.motor)
+            local limb = targetChar:FindFirstChild(v.partName)
+            if motor and limb then
+                return motor, limb
+            elseif limb then
+                return nil, limb
             end
         end
+        return nil, nil
     end
-end)
 
+    local motor6d, limb = findLimb()
+    if motor6d then motor6d:Destroy() end
+
+    local swordHandle = swordTool:FindFirstChild("Handle")
+    if not swordHandle or not limb then return end
+
+    local running = true
+    spawn(function()
+        while running do
+            if not targetPlayer.Character or
+               not targetPlayer.Character:FindFirstChildOfClass("Humanoid") or
+               targetPlayer.Character:FindFirstChildOfClass("Humanoid").Health <= 0 then
+                running = false
+                break
+            end
+
+            if not character:FindFirstChild("OverseerwrathSword") then
+                running = false
+                break
+            end
+
+            if limb and swordHandle then
+                local offset = Vector3.new(
+                    math.random() - 0.5,
+                    math.random() - 0.5,
+                    math.random() - 0.5
+                )
+                limb.CFrame = swordHandle.CFrame * CFrame.new(offset)
+            end
+
+            task.wait(0.05)
+        end
+    end)
+end)
 
 
 addcmd("giveblocks", {}, function(args, speaker)
